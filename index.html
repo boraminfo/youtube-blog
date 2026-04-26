@@ -77,6 +77,14 @@
       transform: translateY(-4px);
       box-shadow: 0 6px 20px rgba(0,0,0,0.14);
     }
+    .card.dragging {
+      opacity: 0.4;
+      transform: scale(0.97);
+    }
+    .card.drag-over {
+      border: 2px dashed #00AEEF;
+      transform: scale(1.02);
+    }
 
     .thumb-wrap {
       position: relative;
@@ -386,6 +394,29 @@
       font-size: 0.9rem;
     }
 
+    /* ── 관리자 모드 ── */
+    #admin-toggle {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #ccc;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      z-index: 500;
+      transition: background 0.2s;
+    }
+    #admin-toggle.on { background: #00AEEF; }
+
+    .admin-only { display: none; }
+    body.admin-mode .admin-only { display: flex; }
+    body.admin-mode #add-section { display: block; }
+    #add-section { display: none; }
+
     footer {
       text-align: center;
       padding: 20px;
@@ -425,6 +456,7 @@
     <button id="naver-btn">네이버 블로그 글 생성</button>
     <button id="export-btn" class="io-btn">JSON 내보내기</button>
     <label id="import-label" class="io-btn">JSON 가져오기<input type="file" id="import-file" accept=".json"/></label>
+
   </div>
 
   <!-- 검색 -->
@@ -475,6 +507,7 @@
 </div>
 
 
+<button id="admin-toggle" title="관리자 모드">&#x1F512;</button>
 <footer>유튜브 모음 블로그 &copy; 2026</footer>
 
 <script>
@@ -540,11 +573,12 @@
     }
     empty.style.display = 'none';
 
-    grid.innerHTML = filtered.map((v, i) => {
+    grid.innerHTML = filtered.map((v) => {
+
       const idx = data.indexOf(v);
       const thumb = `https://img.youtube.com/vi/${v.id}/hqdefault.jpg`;
       return `
-        <div class="card">
+        <div class="card" draggable="true" data-idx="${idx}">
           <div class="thumb-wrap" onclick="openModal('${v.id}')">
             <img src="${thumb}" alt="${v.title}" loading="lazy" />
             <div class="play-btn">
@@ -559,7 +593,7 @@
             <h3>${v.title}</h3>
             ${v.desc ? `<p>${v.desc}</p>` : ''}
             <div class="date">${v.date || ''}
-              <span style="float:right;display:flex;gap:8px;">
+              <span style="float:right;display:flex;gap:8px;" class="admin-only">
                 <span style="cursor:pointer;color:#00AEEF;" onclick="editVideo(${idx})" title="수정">&#x270E;</span>
                 <span style="cursor:pointer;color:#ccc;" onclick="removeVideo(${idx})" title="삭제">&#x1F5D1;</span>
               </span>
@@ -567,6 +601,8 @@
           </div>
         </div>`;
     }).join('');
+
+    initDrag();
   }
 
   /* ─── 영상 추가 ─── */
@@ -717,6 +753,74 @@
     if (e.target === document.getElementById('naver-overlay')) closeNaver();
   });
 
+  /* ─── 관리자 모드 ─── */
+  const ADMIN_PW = '7777';  // ← 비밀번호 여기서 변경
+
+  let isAdmin = sessionStorage.getItem('admin') === 'true';
+  function applyAdmin() {
+    if (isAdmin) {
+      document.body.classList.add('admin-mode');
+      document.getElementById('admin-toggle').classList.add('on');
+      document.getElementById('admin-toggle').textContent = '🔓';
+    } else {
+      document.body.classList.remove('admin-mode');
+      document.getElementById('admin-toggle').classList.remove('on');
+      document.getElementById('admin-toggle').textContent = '🔒';
+    }
+    renderCards();
+  }
+
+  document.getElementById('admin-toggle').addEventListener('click', () => {
+    if (isAdmin) {
+      isAdmin = false;
+      sessionStorage.removeItem('admin');
+      applyAdmin();
+    } else {
+      const pw = prompt('관리자 비밀번호를 입력하세요:');
+      if (pw === ADMIN_PW) {
+        isAdmin = true;
+        sessionStorage.setItem('admin', 'true');
+        applyAdmin();
+      } else if (pw !== null) {
+        alert('비밀번호가 틀렸습니다.');
+      }
+    }
+  });
+
+  /* ─── 드래그로 순서 변경 ─── */
+  let dragSrcIdx = null;
+
+  function initDrag() {
+    document.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('dragstart', e => {
+        dragSrcIdx = parseInt(card.dataset.idx);
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+      });
+      card.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+        card.classList.add('drag-over');
+      });
+      card.addEventListener('drop', e => {
+        e.preventDefault();
+        const dropIdx = parseInt(card.dataset.idx);
+        if (dragSrcIdx === null || dragSrcIdx === dropIdx) return;
+        const data = load();
+        const moved = data.splice(dragSrcIdx, 1)[0];
+        data.splice(dropIdx, 0, moved);
+        save(data);
+        renderTabs(data);
+        renderCards();
+      });
+    });
+  }
+
   /* ─── JSON 내보내기 ─── */
   document.getElementById('export-btn').addEventListener('click', () => {
     const data = load();
@@ -766,6 +870,7 @@
   }
 
   /* ─── 초기화 ─── */
+  applyAdmin();
   initData();
 </script>
 </body>
