@@ -858,7 +858,7 @@
   /* ─── GitHub Pages용 videos.json 자동 로드 ─── */
   async function initData() {
     // localhost가 아닌 경우(GitHub Pages 등) videos.json 자동 로드 시도
-    if (location.protocol !== 'file:' && load().length === 0) {
+    if (location.protocol !== 'file:') {
       try {
         const res = await fetch('./videos.json');
         if (res.ok) {
