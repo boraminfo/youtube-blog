@@ -678,7 +678,13 @@
 
   /* ─── 유튜브 새 탭으로 열기 ─── */
   function openModal(videoId) {
-    window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
+    const a = document.createElement('a');
+    a.href = `https://www.youtube.com/watch?v=${videoId}`;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   /* ─── 네이버 블로그 글 생성 ─── */
